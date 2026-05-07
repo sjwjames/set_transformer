@@ -11,6 +11,7 @@ import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from models import SetTransformer, DeepSet
+from modified_ds import DTanh
 from mixture_of_mvns import MixtureOfMVNs
 from mvn_diag import MultivariateNormalDiag
 
@@ -41,11 +42,21 @@ D = 2
 mvn = MultivariateNormalDiag(D)
 mog = MixtureOfMVNs(mvn)
 dim_output = 2*D
+dim_hidden = 128
+
+# DEVICE = torch.device(
+#     "cuda" if torch.cuda.is_available() else
+#     "mps" if torch.backends.mps.is_available() else
+#     "cpu"
+# )
+DEVICE = torch.device("cpu")
 
 if args.net == 'set_transformer':
-    net = SetTransformer(D, K, dim_output).cuda()
+    net = SetTransformer(D, K, dim_output).to(DEVICE)
 elif args.net == 'deepset':
-    net = DeepSet(D, K, dim_output).cuda()
+    net = DeepSet(D, K, dim_output).to(DEVICE)
+elif args.net == 'deepset_modified':
+    net = DTanh(D,dim_hidden,dim_output,K).to(DEVICE)
 else:
     raise ValueError('Invalid net {}'.format(args.net))
 benchfile = os.path.join('benchmark', 'mog_{:d}.pkl'.format(K))
@@ -88,7 +99,7 @@ def train():
         net.train()
         optimizer.zero_grad()
         N = np.random.randint(N_min, N_max)
-        X = mog.sample(B, N, K)
+        X = mog.sample(B, N, K).to(DEVICE)
         ll = mog.log_prob(X, *mvn.parse(net(X)))
         loss = -ll
         loss.backward()
@@ -113,11 +124,14 @@ def test(bench, verbose=True):
     net.eval()
     data, oracle_ll = bench
     avg_ll = 0.
+    ll_list = []
     for X in data:
-        X = X.cuda()
-        avg_ll += mog.log_prob(X, *mvn.parse(net(X))).item()
-    avg_ll /= len(data)
-    line = 'test ll {:.4f} (oracle {:.4f})'.format(avg_ll, oracle_ll)
+        X = X.to(DEVICE)
+        ll = mog.log_prob(X, *mvn.parse(net(X))).item()
+        ll_list.append(ll)
+    avg_ll = np.mean(ll_list)
+    ll_std = np.std(ll_list)
+    line = 'test ll {:.4f}, std {:.4f} (oracle {:.4f})'.format(avg_ll,ll_std, oracle_ll)
     if verbose:
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger(args.run_name)
@@ -133,7 +147,8 @@ def plot():
     ll, labels = mog.log_prob(X, pi, params, return_labels=True)
     fig, axes = plt.subplots(2, B//2, figsize=(7*B//5,5))
     mog.plot(X, labels, params, axes)
-    plt.show()
+    # plt.show()
+    plt.savefig("output.pdf")
 
 if __name__ == '__main__':
     if args.mode == 'bench':

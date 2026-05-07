@@ -1,5 +1,5 @@
 from modules import *
-
+import torch.nn as nn
 class DeepSet(nn.Module):
     def __init__(self, dim_input, num_outputs, dim_output, dim_hidden=128):
         super(DeepSet, self).__init__()
@@ -42,3 +42,5 @@ class SetTransformer(nn.Module):
 
     def forward(self, X):
         return self.dec(self.enc(X))
+
+

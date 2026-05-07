@@ -23,15 +23,15 @@ def scatter(X, labels=None, ax=None, colors=None, **kwargs):
 
 def draw_ellipse(pos, cov, ax=None, **kwargs):
     if type(pos) != np.ndarray:
-        pos = to_numpy(pos)
+        pos = pos.to_numpy()
     if type(cov) != np.ndarray:
-        cov = to_numpy(cov)
+        cov = cov.to_numpy()
     ax = ax or plt.gca()
     U, s, Vt = np.linalg.svd(cov)
     angle = np.degrees(np.arctan2(U[1,0], U[0,0]))
     width, height = 2 * np.sqrt(s)
     for nsig in range(1, 6):
-        ax.add_patch(Ellipse(pos, nsig*width, nsig*height, angle,
+        ax.add_patch(Ellipse(pos, nsig*width, nsig*height, angle=angle,
             alpha=0.5/nsig, **kwargs))
 
 def scatter_mog(X, labels, mu, cov, ax=None, colors=None):
